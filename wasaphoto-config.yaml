@@ -1,0 +1,15 @@
+log_file: "/app/wasaphoto/log/webapi.log"
+debug: false
+image_storage:
+  path: "/app/wasaphoto/images"
+db:
+  user: "admin"
+  password: "admin"
+  address: "mysql-database:3306"
+  database: "wasaphoto"
+web:
+  api_host: "0.0.0.0:3000"
+  debug_host: "0.0.0.0:4000"
+  read_timeout: 5s
+  write_timeout: 5s
+  shutdown_timeout: 5s

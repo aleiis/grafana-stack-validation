@@ -1,0 +1,120 @@
+services:
+
+  ##### MYSQL DATABASE #####
+  database:
+    image: mysql
+    container_name: mysql-database
+    restart: always
+    environment:
+      MYSQL_DATABASE: 'wasaphoto'
+      MYSQL_USER: 'admin'
+      MYSQL_PASSWORD: 'admin'
+      MYSQL_ROOT_PASSWORD: 'root'
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-database:/var/lib/mysql
+
+  ##### WASAPHOTO #####
+  backend:
+    image: docker.io/aleiis/wasaphoto-backend:v1.3
+    container_name: wasaphoto-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - WASAPHOTO_CONFIG_FILE=/app/config.yml
+    volumes:
+      - ./wasaphoto-config.yaml:/app/config.yml
+      - wasaphoto-data:/app/wasaphoto
+
+  frontend:
+    image: docker.io/aleiis/wasaphoto-frontend:v1.1
+    container_name: wasaphoto-frontend
+    ports:
+      - "9191:80"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  ##### GRAFANA #####
+  grafana:
+    image: grafana/grafana-oss
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      - TERM=linux
+    ports: 
+      - '3003:3000'
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+  ##### LOKI #####
+  loki:
+    image: grafana/loki:2.9.2
+    container_name: loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yaml:/config/config.yaml
+      - loki-data:/tmp/loki/chunks
+    command: -config.file=config/config.yaml
+
+
+  ##### CADVISOR AND PROMETHEUS #####
+
+  # cAdvisor (short for container Advisor) analyzes and exposes 
+  # resource usage and performance data from running containers. 
+  # cAdvisor analyzes all the Docker containers that are executing
+  # in the same host as cAdvisor. It's not necessary to manually 
+  # configure cAdvisor for each container, it already has access 
+  # to the whole Docker system.   
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    ports:
+    - 8080:8080
+    volumes:
+    - /:/rootfs:ro
+    - /var/run:/var/run:rw
+    - /sys:/sys:ro
+    - /var/lib/docker/:/var/lib/docker:ro
+
+  # Prometheus must have a config YAML to scrape metrics from cAdvisor.
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+    - 9090:9090
+    command:
+    - --config.file=/etc/prometheus/prometheus.yaml
+    volumes:
+    - ./prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+    depends_on:
+    - cadvisor
+
+
+  ##### CORTEX #####
+  cortex:
+    image: quay.io/cortexproject/cortex:v1.18.1
+    container_name: cortex
+    command:
+      - -config.file=/config/cortex-config.yaml
+    volumes:
+      - ./cortex-config.yaml:/config/cortex-config.yaml:ro
+    ports:
+      - "9009:9009"
+    healthcheck:
+        test: wget -qO- http://localhost:9009/ready
+        interval: 10s
+        timeout: 10s
+        retries: 3
+    restart: unless-stopped
+
+volumes:
+  wasaphoto-data: {}
+  mysql-database: {}
+  grafana-data: {}
+  loki-data: {}
