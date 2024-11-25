@@ -14,10 +14,37 @@ services:
       - "3306:3306"
     volumes:
       - mysql-database:/var/lib/mysql
+      - ./mysql-exporter-permissions.sql:/docker-entrypoint-initdb.d/mysql-exporter-permissions.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  database-exporter:
+    image: prom/mysqld-exporter
+    container_name: database-exporter
+    restart: unless-stopped
+    command: 
+      - --mysqld.address=database:3306
+      - --mysqld.username=exporter
+    environment:
+      MYSQLD_EXPORTER_PASSWORD: "exporter"
+    ports:
+      - "9104:9104"
+    depends_on:
+      database:
+        condition: service_healthy
 
   ##### WASAPHOTO #####
   backend:
-    image: docker.io/aleiis/wasaphoto-backend:v1.3
+    image: docker.io/aleiis/wasaphoto-backend:v1.3.1
     container_name: wasaphoto-backend
     ports:
       - "3000:3000"
@@ -26,6 +53,14 @@ services:
     volumes:
       - ./wasaphoto-config.yaml:/app/config.yml
       - wasaphoto-data:/app/wasaphoto
+    depends_on:
+      database:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
 
   frontend:
     image: docker.io/aleiis/wasaphoto-frontend:v1.1
@@ -59,9 +94,20 @@ services:
       - "3100:3100"
     volumes:
       - ./loki-config.yaml:/config/config.yaml
-      - loki-data:/tmp/loki/chunks
     command: -config.file=config/config.yaml
 
+  ##### ALLOY #####
+  alloy:
+    image: grafana/alloy:latest
+    container_name: alloy
+    ports:
+      - "12345:12345"
+    volumes:
+      - "./config.alloy:/etc/alloy/config.alloy"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    depends_on:
+      - loki
 
   ##### CADVISOR AND PROMETHEUS #####
 
@@ -92,6 +138,7 @@ services:
     - --config.file=/etc/prometheus/prometheus.yaml
     volumes:
     - ./prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+    - prometheus-data:/prometheus
     depends_on:
     - cadvisor
 
@@ -114,7 +161,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  wasaphoto-data: {}
   mysql-database: {}
+  wasaphoto-data: {}
   grafana-data: {}
-  loki-data: {}
+  prometheus-data: {}
