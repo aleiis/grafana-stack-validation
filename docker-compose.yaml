@@ -109,6 +109,27 @@ services:
     depends_on:
       - loki
 
+  ##### TEMPO #####
+  memcached:
+    image: memcached:1.6.29
+    container_name: memcached
+    ports:
+      - "11211:11211"
+    environment:
+      - MEMCACHED_MAX_MEMORY=64m  # Set the maximum memory usage
+      - MEMCACHED_THREADS=4       # Number of threads to use
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./tempo-config.yaml:/etc/tempo.yaml
+    ports:
+      - "4318:4318"  # otlp http
+    depends_on:
+      - memcached
+
   ##### CADVISOR AND PROMETHEUS #####
 
   # cAdvisor (short for container Advisor) analyzes and exposes 
