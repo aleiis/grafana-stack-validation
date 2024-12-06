@@ -135,9 +135,9 @@ services:
     ports:
     - 9090:9090
     command:
-    - --config.file=/etc/prometheus/prometheus.yaml
+    - --config.file=/etc/prometheus/prometheus-config.yaml
     volumes:
-    - ./prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+    - ./prometheus-config.yaml:/etc/prometheus/prometheus-config.yaml:ro
     - prometheus-data:/prometheus
     depends_on:
     - cadvisor
