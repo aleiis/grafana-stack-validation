@@ -44,15 +44,18 @@ services:
 
   ##### WASAPHOTO #####
   backend:
-    image: docker.io/aleiis/wasaphoto-backend:v1.3.1
+    # image: docker.io/aleiis/wasaphoto-backend:v1.3.1
+    image: aleiis/wasaphoto-backend-otel
     container_name: wasaphoto-backend
     ports:
-      - "3000:3000"
+      - "5000:5000"
     environment:
       - WASAPHOTO_CONFIG_FILE=/app/config.yml
     volumes:
       - ./wasaphoto-config.yaml:/app/config.yml
       - wasaphoto-data:/app/wasaphoto
+      - wasaphoto-bin:/app/bin
+    command: ["sh", "-c", "cp /app/webapi /app/bin/webapi && /app/bin/webapi"]
     depends_on:
       database:
         condition: service_healthy
@@ -62,9 +65,24 @@ services:
         max-size: "50m"
         max-file: "3"
 
+  # frontend:
+  #   image: docker.io/aleiis/wasaphoto-frontend:v1.1
+  #   container_name: wasaphoto-frontend
+  #   ports:
+  #     - "9191:80"
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "50m"
+  #       max-file: "3"
+
   frontend:
-    image: docker.io/aleiis/wasaphoto-frontend:v1.1
+    image: aleiis/wasaphoto-frontend-otel:latest
     container_name: wasaphoto-frontend
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./otel-instrument.js:/usr/share/nginx/html/assets/otel-instrument.js
+      - ./opentelemetry_module.conf:/etc/nginx/conf.d/opentelemetry_module.conf
     ports:
       - "9191:80"
     logging:
@@ -109,7 +127,32 @@ services:
     depends_on:
       - loki
 
-  ##### TEMPO #####
+  ##### TEMPO (traces) #####
+  # go-auto:
+  #   image: otel/autoinstrumentation-go
+  #   privileged: true
+  #   pid: "host"
+  #   environment:
+  #     - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4318
+  #     - OTEL_GO_AUTO_TARGET_EXE=/app/bin/webapi
+  #     - OTEL_SERVICE_NAME=webapi-auto
+  #     - OTEL_PROPAGATORS=tracecontext,baggage
+  #   volumes:
+  #     - wasaphoto-bin:/app/bin/webapi
+  #     - /proc:/host/proc
+  #   depends_on:
+  #     - backend
+  #     - tempo
+
+  # The envoy proxy is used to add tracing headers to the requests and 
+  # forward them to the backend.
+  envoy-front-proxy:
+    image: envoyproxy/envoy:v1.31-latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./envoy-front-proxy-config.yaml:/etc/envoy/envoy.yaml
+
   memcached:
     image: memcached:1.6.29
     container_name: memcached
@@ -126,6 +169,7 @@ services:
     volumes:
       - ./tempo-config.yaml:/etc/tempo.yaml
     ports:
+      - "4317:4317"  # otlp gRPC
       - "4318:4318"  # otlp http
     depends_on:
       - memcached
@@ -186,3 +230,4 @@ volumes:
   wasaphoto-data: {}
   grafana-data: {}
   prometheus-data: {}
+  wasaphoto-bin: {}
