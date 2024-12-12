@@ -48,7 +48,7 @@ services:
     image: aleiis/wasaphoto-backend-otel
     container_name: wasaphoto-backend
     ports:
-      - "5000:5000"
+      - "3000:3000"
     environment:
       - WASAPHOTO_CONFIG_FILE=/app/config.yml
     volumes:
@@ -65,24 +65,10 @@ services:
         max-size: "50m"
         max-file: "3"
 
-  # frontend:
-  #   image: docker.io/aleiis/wasaphoto-frontend:v1.1
-  #   container_name: wasaphoto-frontend
-  #   ports:
-  #     - "9191:80"
-  #   logging:
-  #     driver: "json-file"
-  #     options:
-  #       max-size: "50m"
-  #       max-file: "3"
-
   frontend:
-    image: aleiis/wasaphoto-frontend-otel:latest
+    # image: docker.io/aleiis/wasaphoto-frontend:v1.1
+    image: docker.io/aleiis/wasaphoto-frontend-otel
     container_name: wasaphoto-frontend
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./otel-instrument.js:/usr/share/nginx/html/assets/otel-instrument.js
-      - ./opentelemetry_module.conf:/etc/nginx/conf.d/opentelemetry_module.conf
     ports:
       - "9191:80"
     logging:
@@ -101,9 +87,9 @@ services:
     ports: 
       - '3003:3000'
     volumes:
-      - grafana-data:/var/lib/grafana
+      - ./grafana:/var/lib/grafana
 
-  ##### LOKI #####
+  ##### LOKI and ALLOY #####
   loki:
     image: grafana/loki:2.9.2
     container_name: loki
@@ -114,7 +100,6 @@ services:
       - ./loki-config.yaml:/config/config.yaml
     command: -config.file=config/config.yaml
 
-  ##### ALLOY #####
   alloy:
     image: grafana/alloy:latest
     container_name: alloy
@@ -128,30 +113,35 @@ services:
       - loki
 
   ##### TEMPO (traces) #####
-  # go-auto:
-  #   image: otel/autoinstrumentation-go
-  #   privileged: true
-  #   pid: "host"
-  #   environment:
-  #     - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4318
-  #     - OTEL_GO_AUTO_TARGET_EXE=/app/bin/webapi
-  #     - OTEL_SERVICE_NAME=webapi-auto
-  #     - OTEL_PROPAGATORS=tracecontext,baggage
-  #   volumes:
-  #     - wasaphoto-bin:/app/bin/webapi
-  #     - /proc:/host/proc
-  #   depends_on:
-  #     - backend
-  #     - tempo
-
-  # The envoy proxy is used to add tracing headers to the requests and 
-  # forward them to the backend.
-  envoy-front-proxy:
-    image: envoyproxy/envoy:v1.31-latest
-    ports:
-      - "3000:3000"
+  go-auto:
+    image: otel/autoinstrumentation-go
+    privileged: true
+    pid: "host"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4318
+      - OTEL_GO_AUTO_TARGET_EXE=/app/bin/webapi
+      - OTEL_SERVICE_NAME=webapi-auto
+      - OTEL_PROPAGATORS=tracecontext,baggage
     volumes:
-      - ./envoy-front-proxy-config.yaml:/etc/envoy/envoy.yaml
+      - wasaphoto-bin:/app/bin/webapi
+      - /proc:/host/proc
+    depends_on:
+      - backend
+      - tempo
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib
+    container_name: otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      # - 1888:1888 # pprof extension
+      # - 8888:8888 # Prometheus metrics exposed by the Collector
+      # - 8889:8889 # Prometheus exporter metrics
+      # - 13133:13133 # health_check extension
+      - 4317:4317 # OTLP gRPC receiver
+      - 4318:4318 # OTLP http receiver
+      # - 55679:55679 # zpages extension
 
   memcached:
     image: memcached:1.6.29
@@ -169,8 +159,8 @@ services:
     volumes:
       - ./tempo-config.yaml:/etc/tempo.yaml
     ports:
-      - "4317:4317"  # otlp gRPC
-      - "4318:4318"  # otlp http
+      - "14317:4317"  # otlp gRPC
+      - "14318:4318"  # otlp http
     depends_on:
       - memcached
 
@@ -228,6 +218,5 @@ services:
 volumes:
   mysql-database: {}
   wasaphoto-data: {}
-  grafana-data: {}
-  prometheus-data: {}
   wasaphoto-bin: {}
+  prometheus-data: {}

@@ -2,14 +2,22 @@ receivers:
   otlp:
     protocols:
       grpc:
+        endpoint: "0.0.0.0:4317"
       http:
+        endpoint: "0.0.0.0:4318"
+        cors:
+          allowed_origins: ["http://*"]
+          allowed_headers: ["*"]
+        # tls:
+        #   insecure: true
 
 exporters:
-  otlp:
-    endpoint: "http://jaeger:14250"
+  debug:
+  otlphttp:
+    endpoint: "http://tempo:4318"
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [otlp]
+      exporters: [debug, otlphttp]
