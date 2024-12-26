@@ -50,15 +50,19 @@ compactor:
     block_retention: 24h                # overall Tempo trace retention. set for demo purposes
 
 metrics_generator:
+  # Registry configuration
   registry:
+    # A list of labels that will be added to all generated metrics.
     external_labels:
       source: tempo
       cluster: docker-compose
   storage:
     path: /var/tempo/generator/wal
     remote_write:
-      - url: http://prometheus:9090/api/v1/write
+      - url: http://cortex:9009/api/v1/push
         send_exemplars: true
+  # Configuration block for the Write Ahead Log (WAL)
+  # Must be set
   traces_storage:
     path: /var/tempo/generator/traces
 
