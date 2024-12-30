@@ -35,5 +35,5 @@ web:
   shutdown_timeout: 5s
 
 # OTLP Configuration
-# otlp:
-#   http_trace_exporter_endpoint: "otel-collector:4318"
+otlp:
+  http_trace_exporter_endpoint: "otel-collector:4318"
