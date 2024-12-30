@@ -64,8 +64,6 @@ El proyecto está estructurado de la siguiente manera:
 * `tempo-config.yaml`: configuración de Tempo.
 * `wasaphoto-config.yaml`: configuración de la aplicación WASAPhoto.
 
-## Cortex
+## Wiki
 
-Cortex es un sistema de almacenamiento de series temporales de alto rendimiento y multi-tenant. Permite almacenar, indexar y consultar métricas. Se trata de una implementación de la API de Prometheus que permite almacenar métricas en un almacenamiento de series temporales distribuido.
-
-Toda la información sobre los módulos y la implementación de Cortex se puede encontrar en su documentación oficial: [https://cortexmetrics.io/](https://cortexmetrics.io/)
+El proceso de recolección e ingesta de datos y de configuración se detallan en la [wiki](https://github.com/aleiis/grafana-stack-validation/wiki) del repositorio.
